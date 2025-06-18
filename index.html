@@ -12,22 +12,6 @@
         <div class="card">
             <h1>🖨️ Impresor de Texto</h1>
             <p class="subtitle">Escribe tu texto y envía a imprimir</p>
-            
-            <div class="printer-info" id="printerInfo">
-                <div class="info-item">
-                    <span class="info-label">Puerto:</span>
-                    <span class="info-value" id="portValue">No configurado</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Copias:</span>
-                    <span class="info-value" id="copiesValue">1</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">Data adicional:</span>
-                    <span class="info-value" id="dataValue">Ninguna</span>
-                </div>
-            </div>
-            
             <div class="input-section">
                 <textarea 
                     id="textInput" 
@@ -35,29 +19,24 @@
                     rows="10"
                 ></textarea>
             </div>
-            
             <div class="button-section">
                 <button id="printBtn" class="print-button">
                     <span class="button-icon">🖨️</span>
                     Imprimir Texto
                 </button>
             </div>
-            
             <div class="print-history">
                 <h3>📋 Historial de Impresiones</h3>
                 <div id="printHistory" class="history-list">
                     <p class="empty-message">No hay impresiones registradas</p>
                 </div>
             </div>
-            
             <div class="info">
                 <p>💡 Tip: El texto se imprimirá exactamente como lo escribas</p>
                 <p>⌨️ Atajo: Ctrl/Cmd + Enter para imprimir rápidamente</p>
-                <p>⚙️ Configura la impresora desde la app Flutter</p>
             </div>
         </div>
     </div>
-    
     <script src="script.js"></script>
 </body>
 </html> 

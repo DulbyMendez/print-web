@@ -19,62 +19,49 @@ document.addEventListener('DOMContentLoaded', function() {
         // Agregar al historial
         addToHistory(text, 'success');
         
-        // Efecto de carga en el botón
-        const originalText = printBtn.innerHTML;
-        printBtn.innerHTML = '<span class="button-icon">⏳</span> Imprimiendo...';
-        printBtn.disabled = true;
-        
-        // Simular proceso de impresión
-        setTimeout(() => {
-            // Crear ventana de impresión
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Texto para Imprimir</title>
-                    <style>
+        // Abrir ventana de impresión inmediatamente
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Texto para Imprimir</title>
+                <style>
+                    body {
+                        font-family: 'Arial', sans-serif;
+                        font-size: 12pt;
+                        line-height: 1.5;
+                        margin: 2cm;
+                        color: #000;
+                    }
+                    .text-content {
+                        white-space: pre-wrap;
+                        word-wrap: break-word;
+                    }
+                    @media print {
                         body {
-                            font-family: 'Arial', sans-serif;
-                            font-size: 12pt;
-                            line-height: 1.5;
-                            margin: 2cm;
-                            color: #000;
+                            margin: 1cm;
                         }
-                        .text-content {
-                            white-space: pre-wrap;
-                            word-wrap: break-word;
-                        }
-                        @media print {
-                            body {
-                                margin: 1cm;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="text-content">${text}</div>
-                    <script>
-                        window.onload = function() {
-                            window.print();
-                            window.onafterprint = function() {
-                                window.close();
-                            };
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="text-content">${text}</div>
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        window.onafterprint = function() {
+                            window.close();
                         };
-                    </script>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-            
-            // Restaurar botón
-            printBtn.innerHTML = originalText;
-            printBtn.disabled = false;
-            
-            // Mostrar mensaje de éxito
-            showMessage('Texto enviado a impresión exitosamente', 'success');
-            
-        }, 1000);
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        
+        // Mostrar mensaje de éxito
+        showMessage('Texto enviado a impresión exitosamente', 'success');
     }
 
     // Función para agregar al historial
