@@ -6,61 +6,35 @@ document.addEventListener('DOMContentLoaded', function() {
     // Array para almacenar el historial de impresiones
     let printHistoryList = [];
 
-    // Función para imprimir
+    // Función para imprimir en la misma pestaña
     function printText() {
         const text = textInput.value.trim();
-        
         if (!text) {
             alert('Por favor, escribe algo antes de imprimir');
             textInput.focus();
             return;
         }
 
-        // Agregar al historial
         addToHistory(text, 'success');
+
+        // Guardar el HTML original
+        const originalHTML = document.body.innerHTML;
+
+        // Reemplazar el body con solo el texto a imprimir
+        document.body.innerHTML = `
+            <div class="text-content" style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 2cm; color: #000; white-space: pre-wrap; word-wrap: break-word;">
+                ${text}
+            </div>
+        `;
+
+        window.print();
+
+        // Restaurar la interfaz después de imprimir
+        setTimeout(() => {
+            document.body.innerHTML = originalHTML;
+            location.reload(); // Recarga para restaurar eventos y estado
+        }, 100);
         
-        // Abrir ventana de impresión inmediatamente
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Texto para Imprimir</title>
-                <style>
-                    body {
-                        font-family: 'Arial', sans-serif;
-                        font-size: 12pt;
-                        line-height: 1.5;
-                        margin: 2cm;
-                        color: #000;
-                    }
-                    .text-content {
-                        white-space: pre-wrap;
-                        word-wrap: break-word;
-                    }
-                    @media print {
-                        body {
-                            margin: 1cm;
-                        }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="text-content">${text}</div>
-                <script>
-                    window.onload = function() {
-                        window.print();
-                        window.onafterprint = function() {
-                            window.close();
-                        };
-                    };
-                </script>
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
-        
-        // Mostrar mensaje de éxito
         showMessage('Texto enviado a impresión exitosamente', 'success');
     }
 
@@ -73,19 +47,11 @@ document.addEventListener('DOMContentLoaded', function() {
             status: status,
             timestamp: timestamp
         };
-        
-        // Agregar al inicio del array
         printHistoryList.unshift(historyItem);
-        
-        // Limitar a 20 elementos
         if (printHistoryList.length > 20) {
             printHistoryList = printHistoryList.slice(0, 20);
         }
-        
-        // Guardar en localStorage
         localStorage.setItem('printHistory', JSON.stringify(printHistoryList));
-        
-        // Actualizar la interfaz
         updateHistoryUI();
     }
 
@@ -95,13 +61,11 @@ document.addEventListener('DOMContentLoaded', function() {
             printHistory.innerHTML = '<p class="empty-message">No hay impresiones registradas</p>';
             return;
         }
-
         const historyHTML = printHistoryList.map(item => {
             const timeString = item.timestamp.toLocaleString();
             const previewText = item.text.length > 100 
                 ? item.text.substring(0, 100) + '...' 
                 : item.text;
-            
             return `
                 <div class="print-item">
                     <div class="print-header">
@@ -115,26 +79,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
         }).join('');
-
         printHistory.innerHTML = historyHTML;
     }
 
     // Función para mostrar mensajes
     function showMessage(message, type = 'info') {
-        // Crear elemento de mensaje
         const messageDiv = document.createElement('div');
         messageDiv.className = `message message-${type}`;
         messageDiv.textContent = message;
-        
-        // Agregar al DOM
         document.body.appendChild(messageDiv);
-        
-        // Mostrar con animación
         setTimeout(() => {
             messageDiv.classList.add('show');
         }, 100);
-        
-        // Remover después de 3 segundos
         setTimeout(() => {
             messageDiv.classList.remove('show');
             setTimeout(() => {
@@ -179,7 +135,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (savedHistory) {
         try {
             printHistoryList = JSON.parse(savedHistory);
-            // Convertir timestamps de vuelta a objetos Date
             printHistoryList.forEach(item => {
                 item.timestamp = new Date(item.timestamp);
             });
