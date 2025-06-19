@@ -20,6 +20,7 @@ window.printTextareaContent = function() {
 
 window.callDirectPrint = function(content, title, printers) {
     if (isFlutterWebView()) {
+        console.log('[WEB] Enviando impresión a Flutter WebView vía NativePrinter:', { content, title, printers });
         if (window.NativePrinter && window.NativePrinter.postMessage) {
             window.NativePrinter.postMessage(JSON.stringify({
                 content: content,
@@ -27,9 +28,10 @@ window.callDirectPrint = function(content, title, printers) {
                 printers: printers
             }));
         } else {
-            alert("No se detectó el canal NativePrinter de Flutter.");
+            console.warn('[WEB] No se detectó el canal NativePrinter de Flutter.');
         }
     } else {
+        console.log('[WEB] Imprimiendo directamente en el navegador:', { content });
         printInBrowser(content);
     }
 };
