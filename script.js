@@ -1,12 +1,102 @@
+// --- Detección de WebView de Flutter ---
+function isFlutterWebView() {
+    const ua = navigator.userAgent || '';
+    if (ua.includes('Flutter')) return true;
+    if (window.NativePrinter || window.flutter_inappwebview || window.flutter_cuenti) return true;
+    if (window._isFlutterWebView) return true;
+    return false;
+}
+window.setFlutterWebView = function() {
+    window._isFlutterWebView = true;
+};
+
+// --- Funciones globales para impresión ---
+window.printTextareaContent = function() {
+    const textarea = document.getElementById('textInput');
+    if (textarea) {
+        callDirectPrint(textarea.value, "Impresión desde textarea", getPrintersConfig());
+    }
+};
+
+window.callDirectPrint = function(content, title, printers) {
+    if (isFlutterWebView()) {
+        if (window.NativePrinter && window.NativePrinter.postMessage) {
+            window.NativePrinter.postMessage(JSON.stringify({
+                content: content,
+                title: title,
+                printers: printers
+            }));
+        } else {
+            alert("No se detectó el canal NativePrinter de Flutter.");
+        }
+    } else {
+        printInBrowser(content);
+    }
+};
+
+function printInBrowser(content) {
+    const originalHTML = document.body.innerHTML;
+    document.body.innerHTML = `
+        <div class="text-content" style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 2cm; color: #000; white-space: pre-wrap; word-wrap: break-word;">
+            ${content}
+        </div>
+    `;
+    window.print();
+    setTimeout(() => {
+        document.body.innerHTML = originalHTML;
+        location.reload();
+    }, 100);
+}
+
+// --- Inputs dinámicos para impresoras ---
+function getPrintersConfig() {
+    const printers = [];
+    const printerRows = document.querySelectorAll('.printer-row');
+    printerRows.forEach(row => {
+        const ip = row.querySelector('.printer-ip').value.trim();
+        const copies = parseInt(row.querySelector('.printer-copies').value, 10) || 1;
+        if (ip) {
+            printers.push({ ip, copies });
+        }
+    });
+    return printers;
+}
+
+function addPrinterRow(ip = '', copies = 1) {
+    const printersContainer = document.getElementById('printersContainer');
+    const row = document.createElement('div');
+    row.className = 'printer-row';
+    row.innerHTML = `
+        <input type="text" class="printer-ip" placeholder="IP de impresora" value="${ip}" style="width: 160px; margin-right: 8px;" />
+        <input type="number" class="printer-copies" placeholder="Copias" min="1" value="${copies}" style="width: 70px; margin-right: 8px;" />
+        <button type="button" class="remove-printer" title="Quitar impresora">❌</button>
+    `;
+    row.querySelector('.remove-printer').onclick = function() {
+        row.remove();
+    };
+    printersContainer.appendChild(row);
+}
+
+function setupPrintersUI() {
+    const addBtn = document.getElementById('addPrinterBtn');
+    addBtn.onclick = function() {
+        addPrinterRow();
+    };
+    // Al menos una impresora por defecto
+    if (document.querySelectorAll('.printer-row').length === 0) {
+        addPrinterRow();
+    }
+}
+
+// --- Historial e impresión ---
 document.addEventListener('DOMContentLoaded', function() {
     const textInput = document.getElementById('textInput');
     const printBtn = document.getElementById('printBtn');
     const printHistory = document.getElementById('printHistory');
-
-    // Array para almacenar el historial de impresiones
     let printHistoryList = [];
 
-    // Función para imprimir en la misma pestaña
+    setupPrintersUI();
+
     function printText() {
         const text = textInput.value.trim();
         if (!text) {
@@ -14,38 +104,21 @@ document.addEventListener('DOMContentLoaded', function() {
             textInput.focus();
             return;
         }
-
-        addToHistory(text, 'success');
-
-        // Guardar el HTML original
-        const originalHTML = document.body.innerHTML;
-
-        // Reemplazar el body con solo el texto a imprimir
-        document.body.innerHTML = `
-            <div class="text-content" style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.5; margin: 2cm; color: #000; white-space: pre-wrap; word-wrap: break-word;">
-                ${text}
-            </div>
-        `;
-
-        window.print();
-
-        // Restaurar la interfaz después de imprimir
-        setTimeout(() => {
-            document.body.innerHTML = originalHTML;
-            location.reload(); // Recarga para restaurar eventos y estado
-        }, 100);
-        
+        const printers = getPrintersConfig();
+        addToHistory(text, 'success', printers);
+        // Llama a Flutter o imprime en navegador
+        window.callDirectPrint(text, "Impresión desde textarea", printers);
         showMessage('Texto enviado a impresión exitosamente', 'success');
     }
 
-    // Función para agregar al historial
-    function addToHistory(text, status) {
+    function addToHistory(text, status, printers) {
         const timestamp = new Date();
         const historyItem = {
             id: Date.now(),
             text: text,
             status: status,
-            timestamp: timestamp
+            timestamp: timestamp,
+            printers: printers || []
         };
         printHistoryList.unshift(historyItem);
         if (printHistoryList.length > 20) {
@@ -55,7 +128,6 @@ document.addEventListener('DOMContentLoaded', function() {
         updateHistoryUI();
     }
 
-    // Función para actualizar la interfaz del historial
     function updateHistoryUI() {
         if (printHistoryList.length === 0) {
             printHistory.innerHTML = '<p class="empty-message">No hay impresiones registradas</p>';
@@ -66,6 +138,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const previewText = item.text.length > 100 
                 ? item.text.substring(0, 100) + '...' 
                 : item.text;
+            const printersInfo = item.printers && item.printers.length > 0
+                ? `<div class='print-printers'><strong>Impresoras:</strong> ${item.printers.map(p => `${p.ip} (${p.copies} copias)`).join(', ')}</div>`
+                : '';
             return `
                 <div class="print-item">
                     <div class="print-header">
@@ -75,6 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="print-content">
                         <strong>Texto impreso:</strong>
                         <div class="print-preview">${previewText}</div>
+                        ${printersInfo}
                     </div>
                 </div>
             `;
@@ -82,7 +158,6 @@ document.addEventListener('DOMContentLoaded', function() {
         printHistory.innerHTML = historyHTML;
     }
 
-    // Función para mostrar mensajes
     function showMessage(message, type = 'info') {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message message-${type}`;
@@ -99,38 +174,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // Event listener para el botón de imprimir
     printBtn.addEventListener('click', printText);
-
-    // Event listener para Enter + Ctrl/Cmd para imprimir
     textInput.addEventListener('keydown', function(e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
             printText();
         }
     });
-
-    // Auto-resize del textarea
     textInput.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = Math.max(200, this.scrollHeight) + 'px';
     });
-
-    // Focus automático en el textarea
     textInput.focus();
-
-    // Guardar texto en localStorage
     textInput.addEventListener('input', function() {
         localStorage.setItem('savedText', this.value);
     });
-
-    // Cargar texto guardado
     const savedText = localStorage.getItem('savedText');
     if (savedText) {
         textInput.value = savedText;
     }
-
-    // Cargar historial guardado
     const savedHistory = localStorage.getItem('printHistory');
     if (savedHistory) {
         try {
@@ -143,15 +205,11 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error loading print history:', e);
         }
     }
-
-    // Función para limpiar historial (opcional)
     function clearHistory() {
         printHistoryList = [];
         localStorage.removeItem('printHistory');
         updateHistoryUI();
         showMessage('Historial limpiado', 'info');
     }
-
-    // Exponer función para limpiar historial (opcional)
     window.clearPrintHistory = clearHistory;
 }); 
