@@ -1,4 +1,4 @@
-// --- Detección de WebView de Flutter ---
+/* // --- Detección de WebView de Flutter ---
 function isFlutterWebView() {
     const ua = navigator.userAgent || '';
     if (ua.includes('Flutter')) return true;
@@ -19,6 +19,7 @@ window.printTextareaContent = function() {
 };
 
 window.callDirectPrint = function(content, title, printers) {
+    console.log('[WEB] Llamando a callDirectPrint:', { content, title, printers });
     if (isFlutterWebView()) {
         console.log('[WEB] Enviando impresión a Flutter WebView vía NativePrinter:', { content, title, printers });
         if (window.NativePrinter && window.NativePrinter.postMessage) {
@@ -214,4 +215,198 @@ document.addEventListener('DOMContentLoaded', function() {
         showMessage('Historial limpiado', 'info');
     }
     window.clearPrintHistory = clearHistory;
-}); 
+});  */
+
+(function(window, document) {
+    'use strict';
+  
+    // --- Módulo NativePrinter/WebPrint encapsulado ---
+    const PrintBridge = (function() {
+      function isFlutterWebView() {
+        const ua = navigator.userAgent || '';
+        return ua.includes('Flutter')
+          || !!window.NativePrinter
+          || !!window.flutter_inappwebview
+          || !!window.flutter_cuenti
+          || !!window._isFlutterWebView;
+      }
+      function callDirectPrint(content, title, printers) {
+        console.log('[PrintBridge] callDirectPrint:', { content, title, printers });
+        if (isFlutterWebView()) {
+          try {
+            const payload = { content, title, printers };
+            const message = JSON.stringify(payload);
+            window.NativePrinter.postMessage(message);
+            console.log('[PrintBridge] Mensaje enviado a NativePrinter');
+          } catch (err) {
+            console.error('[PrintBridge] Error enviando mensaje:', err);
+          }
+        } else {
+          BrowserPrinter.print(content);
+        }
+      }
+      return { callDirectPrint, isFlutterWebView };
+    })();
+  
+    // --- Módulo impresión en navegador ---
+    const BrowserPrinter = (function() {
+      function print(content) {
+        const originalHTML = document.body.innerHTML;
+        document.body.innerHTML = `
+          <div style="font-family:Arial,sans-serif; font-size:12pt; line-height:1.5; margin:2cm; white-space:pre-wrap;">${content}</div>
+        `;
+        window.print();
+        setTimeout(() => {
+          document.body.innerHTML = originalHTML;
+          location.reload();
+        }, 100);
+      }
+      return { print };
+    })();
+  
+    // --- Módulo UI: gestión de impresoras, textarea e historial ---
+    const PrintUI = (function() {
+      const historyKey = 'printHistory';
+      const textKey = 'savedText';
+      let historyList = [];
+  
+      function init() {
+        setupPrinterInputs();
+        loadText();
+        loadHistory();
+        bindEvents();
+      }
+  
+      function setupPrinterInputs() {
+        const container = document.getElementById('printersContainer');
+        document.getElementById('addPrinterBtn').onclick = () => addPrinterRow('', 1);
+        if (!container.querySelector('.printer-row')) {
+          addPrinterRow('', 1);
+        }
+      }
+  
+      function addPrinterRow(ip = '', copies = 1) {
+        const container = document.getElementById('printersContainer');
+        const row = document.createElement('div');
+        row.className = 'printer-row';
+        row.innerHTML = `
+          <input type="text" class="printer-ip" placeholder="IP de impresora" value="${ip}" />
+          <input type="number" class="printer-copies" min="1" value="${copies}" />
+          <button type="button" class="remove-printer">❌</button>
+        `;
+        row.querySelector('.remove-printer').onclick = () => row.remove();
+        container.appendChild(row);
+      }
+  
+      function getPrintersConfig() {
+        return Array.from(document.querySelectorAll('.printer-row'))
+          .map(row => {
+            const ip = row.querySelector('.printer-ip').value.trim();
+            const copies = parseInt(row.querySelector('.printer-copies').value, 10) || 1;
+            return ip ? { ip, copies } : null;
+          })
+          .filter(p => p);
+      }
+  
+      function bindEvents() {
+        const textInput = document.getElementById('textInput');
+        const printBtn = document.getElementById('printBtn');
+        printBtn.onclick = handlePrint;
+        textInput.onkeydown = e => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            handlePrint();
+          }
+        };
+        textInput.oninput = () => {
+          textInput.style.height = 'auto';
+          textInput.style.height = Math.max(200, textInput.scrollHeight) + 'px';
+          localStorage.setItem(textKey, textInput.value);
+        };
+        window.clearPrintHistory = clearHistory;
+      }
+  
+      function handlePrint() {
+        const content = document.getElementById('textInput').value.trim();
+        if (!content) {
+          alert('Por favor, escribe algo para imprimir');
+          document.getElementById('textInput').focus();
+          return;
+        }
+        const printers = getPrintersConfig();
+        addToHistory(content, 'success', printers);
+        PrintBridge.callDirectPrint(content, 'Impresión desde textarea', printers);
+        showMessage('Texto enviado a impresión', 'success');
+      }
+  
+      function addToHistory(text, status, printers) {
+        const item = { id: Date.now(), text, status, printers, timestamp: new Date() };
+        historyList.unshift(item);
+        if (historyList.length > 20) historyList.pop();
+        localStorage.setItem(historyKey, JSON.stringify(historyList));
+        renderHistory();
+      }
+  
+      function loadHistory() {
+        try {
+          historyList = JSON.parse(localStorage.getItem(historyKey)) || [];
+          historyList.forEach(i => i.timestamp = new Date(i.timestamp));
+        } catch {
+          historyList = [];
+        }
+        renderHistory();
+      }
+  
+      function loadText() {
+        const saved = localStorage.getItem(textKey);
+        if (saved) document.getElementById('textInput').value = saved;
+      }
+  
+      function renderHistory() {
+        const container = document.getElementById('printHistory');
+        if (!historyList.length) {
+          container.innerHTML = '<p>No hay historial de impresión</p>';
+          return;
+        }
+        container.innerHTML = historyList.map(i => {
+          const time = i.timestamp.toLocaleString();
+          const preview = i.text.length > 100 ? i.text.substr(0,100) + '...' : i.text;
+          const printers = i.printers.map(p => `${p.ip} (${p.copies})`).join(', ');
+          return `
+            <div class="history-item">
+              <div><strong>${time}</strong> — ${i.status}</div>
+              <div>${preview} <em>${printers}</em></div>
+            </div>`;
+        }).join('');
+      }
+  
+      function clearHistory() {
+        historyList = [];
+        localStorage.removeItem(historyKey);
+        renderHistory();
+        showMessage('Historial borrado', 'info');
+      }
+  
+      function showMessage(text, type='info') {
+        const msg = document.createElement('div');
+        msg.className = `message ${type}`;
+        msg.textContent = text;
+        document.body.appendChild(msg);
+        setTimeout(() => msg.classList.add('visible'), 50);
+        setTimeout(() => {
+          msg.classList.remove('visible');
+          setTimeout(() => msg.remove(), 350);
+        }, 3000);
+      }
+  
+      return { init };
+    })();
+  
+    // Inicialización al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+      PrintUI.init();
+      window.setFlutterWebView(); // marcar manualmente si necesario
+    });
+  
+  })(window, document);
+  
