@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
         container.innerHTML = historyList.map(i => {
           const time = i.timestamp.toLocaleString();
           const preview = i.text.length > 100 ? i.text.substr(0,100) + '...' : i.text;
-          const printers = i.printers.map(p => `${p.ip} (${p.copies})`).join(', ');
+          const printers = (i.printers || []).map(p => `${p.ip} (${p.copies})`).join(', ');
           return `
             <div class="history-item">
               <div><strong>${time}</strong> — ${i.status}</div>
