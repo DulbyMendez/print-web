@@ -335,8 +335,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         const printers = getPrintersConfig();
         addToHistory(content, 'success', printers);
-        PrintBridge.callDirectPrint(content, 'Impresión desde textarea', printers);
-        showMessage('Texto enviado a impresión', 'success');
+        
+        // Verificar si hay imagen base64 para procesar en Flutter
+        const hasImage = content.includes('<imagen_grande>');
+        
+        if (hasImage && PrintBridge.isFlutterWebView()) {
+          // Enviar a Flutter para procesamiento de imagen
+          console.log('[WEB] Detectada imagen base64, enviando a Flutter para procesamiento');
+          if (window.NativePrinter && window.NativePrinter.postMessage) {
+            window.NativePrinter.postMessage(JSON.stringify({
+              type: 'processInvoiceWithImage',
+              content: content,
+              title: 'Impresión Manual con Imagen',
+              printers: printers
+            }));
+            showMessage('Contenido con imagen enviado a Flutter para procesamiento', 'success');
+          }
+        } else {
+          // Enviar a impresión normal
+          PrintBridge.callDirectPrint(content, 'Impresión desde textarea', printers);
+          showMessage('Texto enviado a impresión', 'success');
+        }
       }
   
       function addToHistory(text, status, printers) {
@@ -391,11 +410,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const msg = document.createElement('div');
         msg.className = `message ${type}`;
         msg.textContent = text;
+        msg.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          padding: 15px 20px;
+          border-radius: 5px;
+          color: white;
+          font-weight: bold;
+          z-index: 1000;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          ${type === 'success' ? 'background-color: #4CAF50;' : ''}
+          ${type === 'error' ? 'background-color: #f44336;' : ''}
+          ${type === 'info' ? 'background-color: #2196F3;' : ''}
+        `;
         document.body.appendChild(msg);
-        setTimeout(() => msg.classList.add('visible'), 50);
+        setTimeout(() => msg.style.opacity = '1', 50);
         setTimeout(() => {
-          msg.classList.remove('visible');
-          setTimeout(() => msg.remove(), 350);
+          msg.style.opacity = '0';
+          setTimeout(() => msg.remove(), 300);
         }, 3000);
       }
   
@@ -406,7 +440,56 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('DOMContentLoaded', () => {
       PrintUI.init();
       window.setFlutterWebView(); // marcar manualmente si necesario
+      
+      // Cargar y enviar el contenido de la factura automáticamente
+      loadAndPrintInvoice();
     });
   
+    // Función para cargar y enviar la factura automáticamente
+    async function loadAndPrintInvoice() {
+      try {
+        const response = await fetch('content.txt');
+        if (response.ok) {
+          const invoiceContent = await response.text();
+          
+          // Colocar el contenido en el textarea
+          const textInput = document.getElementById('textInput');
+          if (textInput) {
+            textInput.value = invoiceContent;
+            textInput.style.height = 'auto';
+            textInput.style.height = Math.max(200, textInput.scrollHeight) + 'px';
+          }
+          
+          // Guardar en localStorage
+          localStorage.setItem('savedText', invoiceContent);
+          
+          // Verificar si hay imagen base64 para procesar en Flutter
+          const hasImage = invoiceContent.includes('<imagen_grande>');
+          
+          if (hasImage && PrintBridge.isFlutterWebView()) {
+            // Enviar a Flutter para procesamiento de imagen
+            console.log('[WEB] Detectada imagen base64, enviando a Flutter para procesamiento');
+            if (window.NativePrinter && window.NativePrinter.postMessage) {
+              window.NativePrinter.postMessage(JSON.stringify({
+                type: 'processInvoiceWithImage',
+                content: invoiceContent,
+                title: 'Factura Electrónica con Imagen',
+                printers: []
+              }));
+              showMessage('Factura con imagen enviada a Flutter para procesamiento', 'success');
+            }
+          } else {
+            // Enviar a impresión normal (sin imagen o en navegador)
+            setTimeout(() => {
+              PrintBridge.callDirectPrint(invoiceContent, 'Factura Electrónica', []);
+              showMessage('Factura enviada a impresión automáticamente', 'success');
+            }, 1000);
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando la factura:', error);
+        showMessage('Error al cargar la factura', 'error');
+      }
+    }
   })(window, document);
   
