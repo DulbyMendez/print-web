@@ -356,9 +356,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.text();
           })
           .then(content => {
-            // Formatear saltos de línea para Flutter
-            const formattedContent = content.replace(/\n/g, '\\n');
-            
             // Obtener configuración de impresoras
             const printers = getPrintersConfig();
             
@@ -374,13 +371,13 @@ document.addEventListener('DOMContentLoaded', function() {
             
             addToHistory(content, 'webview', printers);
             
-            // Enviar a Flutter con IP, contenido formateado y copias
-            console.log('[WEB] Enviando a Flutter:', { ip, copies, contentLength: formattedContent.length });
+            // Enviar a Flutter con IP, contenido y copias
+            console.log('[WEB] Enviando a Flutter:', { ip, copies, contentLength: content.length });
             if (window.NativePrinter && window.NativePrinter.postMessage) {
               window.NativePrinter.postMessage(JSON.stringify({
                 type: 'printToPrinter',
                 ip: ip,
-                content: formattedContent,
+                content: content,
                 copies: copies
               }));
               showMessage(`Factura enviada a impresora ${ip} (${copies} copias)`, 'success');
