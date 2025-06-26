@@ -311,7 +311,11 @@ document.addEventListener('DOMContentLoaded', function() {
       function bindEvents() {
         const textInput = document.getElementById('textInput');
         const printBtn = document.getElementById('printBtn');
+        const webviewPrintBtn = document.getElementById('webviewPrintBtn');
+        
         printBtn.onclick = handlePrint;
+        webviewPrintBtn.onclick = handleWebViewPrint;
+        
         textInput.onkeydown = e => {
           if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
             e.preventDefault();
@@ -324,6 +328,70 @@ document.addEventListener('DOMContentLoaded', function() {
           localStorage.setItem(textKey, textInput.value);
         };
         window.clearPrintHistory = clearHistory;
+        
+        // Mostrar/ocultar botón de WebView según el entorno
+        updateWebViewButtonVisibility();
+      }
+      
+      function updateWebViewButtonVisibility() {
+        const webviewPrintBtn = document.getElementById('webviewPrintBtn');
+        if (webviewPrintBtn) {
+          if (PrintBridge.isFlutterWebView()) {
+            webviewPrintBtn.style.display = 'flex';
+            console.log('[WEB] Botón de WebView mostrado - detectado Flutter WebView');
+          } else {
+            webviewPrintBtn.style.display = 'none';
+            console.log('[WEB] Botón de WebView oculto - navegador normal');
+          }
+        }
+      }
+      
+      function handleWebViewPrint() {
+        // Cargar el contenido de content.txt
+        fetch('content.txt')
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('No se pudo cargar el contenido');
+            }
+            return response.text();
+          })
+          .then(content => {
+            // Formatear saltos de línea para Flutter
+            const formattedContent = content.replace(/\n/g, '\\n');
+            
+            // Obtener configuración de impresoras
+            const printers = getPrintersConfig();
+            
+            if (printers.length === 0) {
+              alert('Por favor, configura al menos una impresora con IP y número de copias');
+              return;
+            }
+            
+            // Tomar la primera impresora configurada
+            const printer = printers[0];
+            const ip = printer.ip;
+            const copies = printer.copies;
+            
+            addToHistory(content, 'webview', printers);
+            
+            // Enviar a Flutter con IP, contenido formateado y copias
+            console.log('[WEB] Enviando a Flutter:', { ip, copies, contentLength: formattedContent.length });
+            if (window.NativePrinter && window.NativePrinter.postMessage) {
+              window.NativePrinter.postMessage(JSON.stringify({
+                type: 'printToPrinter',
+                ip: ip,
+                content: formattedContent,
+                copies: copies
+              }));
+              showMessage(`Factura enviada a impresora ${ip} (${copies} copias)`, 'success');
+            } else {
+              showMessage('Error: No se detectó el canal NativePrinter', 'error');
+            }
+          })
+          .catch(error => {
+            console.error('Error cargando content.txt:', error);
+            showMessage('Error al cargar el contenido de la factura', 'error');
+          });
       }
   
       function handlePrint() {
@@ -391,9 +459,21 @@ document.addEventListener('DOMContentLoaded', function() {
           const time = i.timestamp.toLocaleString();
           const preview = i.text.length > 100 ? i.text.substr(0,100) + '...' : i.text;
           const printers = (i.printers || []).map(p => `${p.ip} (${p.copies})`).join(', ');
+          
+          // Determinar el estado mostrado
+          let statusText = 'Exitoso';
+          let statusClass = 'success';
+          if (i.status === 'webview') {
+            statusText = 'WebView';
+            statusClass = 'webview';
+          } else if (i.status === 'error') {
+            statusText = 'Error';
+            statusClass = 'error';
+          }
+          
           return `
             <div class="history-item">
-              <div><strong>${time}</strong> — ${i.status}</div>
+              <div><strong>${time}</strong> — <span class="status-${statusClass}">${statusText}</span></div>
               <div>${preview} <em>${printers}</em></div>
             </div>`;
         }).join('');

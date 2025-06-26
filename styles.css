@@ -121,22 +121,39 @@ textarea::placeholder {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
-    padding: 15px 30px;
-    border-radius: 50px;
+    border-radius: 12px;
+    padding: 16px 32px;
     font-size: 1.1rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-    display: inline-flex;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    display: flex;
     align-items: center;
-    gap: 10px;
-    font-family: 'Poppins', sans-serif;
+    gap: 8px;
+    margin: 0 auto;
+}
+
+.webview-button {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 16px 32px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px auto 0 auto;
 }
 
 .print-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 15px 30px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
 }
 
 .print-button:active {
@@ -147,6 +164,11 @@ textarea::placeholder {
     opacity: 0.7;
     cursor: not-allowed;
     transform: none;
+}
+
+.webview-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.5);
 }
 
 .button-icon {
@@ -369,4 +391,19 @@ textarea::placeholder {
         min-height: auto;
         height: auto;
     }
+}
+
+.status-success {
+    color: #4CAF50;
+    font-weight: 600;
+}
+
+.status-error {
+    color: #f44336;
+    font-weight: 600;
+}
+
+.status-webview {
+    color: #ff6b6b;
+    font-weight: 600;
 } 
