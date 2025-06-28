@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ejemplo Flutter Print Bridge</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        .printer-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .printer-row input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .printer-ip {
+            width: 150px;
+        }
+        .printer-copies {
+            width: 80px;
+        }
+        .remove-printer {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-printer {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .print-button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .print-button:hover {
+            background: #1976D2;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .status.webview {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #bbdefb;
+        }
+        .status.browser {
+            background: #fff3e0;
+            color: #f57c00;
+            border: 1px solid #ffcc02;
+        }
+        .message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .message.success {
+            background-color: #4CAF50;
+        }
+        .message.error {
+            background-color: #f44336;
+        }
+        .message.info {
+            background-color: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖨️ Flutter Print Bridge - Ejemplo de Uso</h1>
+        
+        <!-- Estado del WebView -->
+        <div class="section">
+            <h3>📱 Estado del Sistema</h3>
+            <div id="webviewStatus" class="status">
+                Detectando entorno...
+            </div>
+        </div>
+
+        <!-- Configuración de Impresoras -->
+        <div class="section">
+            <h3>🖨️ Configuración de Impresoras</h3>
+            <div id="printersContainer">
+                <!-- Las filas de impresoras se agregarán aquí dinámicamente -->
+            </div>
+            <button class="add-printer" onclick="agregarImpresora()">➕ Agregar Impresora</button>
+        </div>
+
+        <!-- Botón de Impresión -->
+        <div class="section">
+            <h3>🚀 Impresión</h3>
+            <button id="webviewPrintBtn" class="print-button">
+                🖨️ Imprimir Factura
+            </button>
+        </div>
+
+        <!-- Información de Debug -->
+        <div class="section">
+            <h3>🔍 Información de Debug</h3>
+            <button onclick="mostrarInfoDebug()" style="background: #9c27b0; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">
+                Mostrar Información de Debug
+            </button>
+            <div id="debugInfo" style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 4px; display: none;">
+                <!-- Información de debug se mostrará aquí -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Incluir el módulo Flutter Print Bridge -->
+    <script src="flutter-print-bridge.js"></script>
+    
+    <script>
+        // Contenido de ejemplo de la factura
+        const facturaEjemplo = `<center><negrita>FACTURA ELECTRONICA DE VENTA
+<center>Importadora La Bombonera HE S.A.S
+<center>Responsable de IVA Regimen Comun 
+<center>NIT: 901.185.393-1 
+<center>Direccion: AUT MEDELLIN BOGOTA KM 46
+<center>Movil: 57+3006389781
+<center>Email: asistentelabombonera@gmail.com
+<center>El Santuario-Antioquia
+------------------------------------------
+FACTURA ELECTRONICA DE VENTA #:FEIB-5390
+FECHA:                     2025-01-20 14:26:09
+------------------------------------------
+Articulo          Can  Valor       Total
+-JMG-1265-KIT      24   $1.050      $25.200
+ MANICURE BX240 unidades
+-JMG64-167-REJILLA 48   $160,21     $7.690
+ LAVA PLATOS BX1200 unidades
+                                    ----------
+------------------------------------------
+CANT.ART:                                   72
+SUBTOTAL:                              $32.890
+TOTAL:                                 $32.890
+Nombre:JAB CACHARRERIA S.A.S.
+NIT:901919284
+Direccion:CRA 16 # 7-31 SEC 2   ADM MARIA
+PATRICIA
+Telefono:3142324624
+Movil:3192324624
+Ciudad:PENOL
+Barrio/Zona:MEGA PRECIOS EL PENOL
+------------------------------------------
+T.Abono:                                    $0
+T.Deuda:                               $32.890
+Firma:____________________________
+                 Medios Pago
+Fecha Vencimiento                   2025-02-20
+Atendido por:                ORFANERY GRAJALES
+Vendedor:        JOHAN STIVEN HERNANDEZ ALZATE
+MENOS 5%   20 DIAS      FLETE -50-50
+<center>Los productos sin IVA en esta factura son
+BIENES EXENTOS - Decreto 417 del 17 de marzo
+de 2020 - Decreto 551 de 15 de abril de 2020.
+<center>Favor Consignar en la FIDUCUENTA BANCOLOMBIA
+No. 031000003647 a nombre de IMPORTADORA LA
+BOMBONERA HE SAS NIT 901185393-1
+<center>Autorizo expresamente a IMPORTADORA LA
+BOMBONERA HE SAS Y / O a su representante
+legal, para ser consultado(a) y verificado(a)
+con terceras personas incluyendo la Base de
+datos y para que el caso de incumplimiento de
+las obligaciones, sea reportado a las bases de
+datos de DATACREDITO o cualquier otro.
+<center>Sus datos seran tratados y administrados segun
+la ley 1581 del 2012 ley de proteccion de
+datos.
+<center>El no pago oportuno causara intereses de mora
+iguales a la tasa maxima legal.
+<center>Esta factura de venta se asimila en todos sus
+efectos a una letra de cambio, art. 774 del
+Codigo de Comercio.
+<center><negrita>****GRACIAS POR SU VISITA****
+          Proceso de validación Dian
+   Ver Factura Electrónica y Bonos Emitidos`;
+
+        // Función para agregar impresora
+        function agregarImpresora() {
+            FlutterPrintBridge.addPrinterRow();
+        }
+
+        // Función para mostrar información de debug
+        function mostrarInfoDebug() {
+            const debugDiv = document.getElementById('debugInfo');
+            const isWebView = FlutterPrintBridge.isFlutterWebView();
+            const content = FlutterPrintBridge.getInvoiceContent();
+            const printers = FlutterPrintBridge.getPrintersConfig();
+            
+            debugDiv.innerHTML = `
+                <h4>Información del Sistema:</h4>
+                <p><strong>WebView de Flutter:</strong> ${isWebView ? '✅ Detectado' : '❌ No detectado'}</p>
+                <p><strong>NativePrinter disponible:</strong> ${window.NativePrinter ? '✅ Sí' : '❌ No'}</p>
+                <p><strong>Contenido configurado:</strong> ${content ? `✅ Sí (${content.length} caracteres)` : '❌ No'}</p>
+                <p><strong>Impresoras configuradas:</strong> ${printers.length} impresora(s)</p>
+                <p><strong>User Agent:</strong> ${navigator.userAgent}</p>
+                <h4>Impresoras:</h4>
+                <ul>
+                    ${printers.map(p => `<li>IP: ${p.ip} - Copias: ${p.copies}</li>`).join('')}
+                </ul>
+            `;
+            debugDiv.style.display = 'block';
+        }
+
+        // Inicialización cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Inicializando ejemplo de Flutter Print Bridge...');
+            
+            // Configurar el contenido de la factura
+            FlutterPrintBridge.setInvoiceContent(facturaEjemplo);
+            
+            // Configurar algunas impresoras de ejemplo
+            FlutterPrintBridge.addPrinterRow('192.168.1.100', 2);
+            FlutterPrintBridge.addPrinterRow('192.168.1.101', 1);
+            
+            // Actualizar el estado del WebView
+            const statusDiv = document.getElementById('webviewStatus');
+            if (FlutterPrintBridge.isFlutterWebView()) {
+                statusDiv.className = 'status webview';
+                statusDiv.innerHTML = '✅ Ejecutando en WebView de Flutter - Listo para imprimir';
+            } else {
+                statusDiv.className = 'status browser';
+                statusDiv.innerHTML = '🌐 Ejecutando en navegador - Se usará impresión del navegador como fallback';
+            }
+            
+            console.log('✅ Ejemplo inicializado correctamente');
+        });
+
+        // Función para simular WebView de Flutter (solo para testing)
+        window.simularWebView = function() {
+            window.setFlutterWebView();
+            location.reload();
+        };
+    </script>
+</body>
+</html> 

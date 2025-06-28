@@ -269,6 +269,19 @@ document.addEventListener('DOMContentLoaded', function() {
       const historyKey = 'printHistory';
       const textKey = 'savedText';
       let historyList = [];
+      
+      // Variable que contiene el contenido de la factura
+      let invoiceContent = null;
+      
+      // Función para establecer el contenido de la factura
+      function setInvoiceContent(content) {
+        invoiceContent = content;
+      }
+      
+      // Función para obtener el contenido de la factura
+      function getInvoiceContent() {
+        return invoiceContent;
+      }
   
       function init() {
         setupPrinterInputs();
@@ -347,48 +360,41 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       function handleWebViewPrint() {
-        // Cargar el contenido de content.txt
-        fetch('content.txt')
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('No se pudo cargar el contenido');
-            }
-            return response.text();
-          })
-          .then(content => {
-            // Obtener configuración de impresoras
-            const printers = getPrintersConfig();
-            
-            if (printers.length === 0) {
-              alert('Por favor, configura al menos una impresora con IP y número de copias');
-              return;
-            }
-            
-            // Tomar la primera impresora configurada
-            const printer = printers[0];
-            const ip = printer.ip;
-            const copies = printer.copies;
-            
-            addToHistory(content, 'webview', printers);
-            
-            // Enviar a Flutter con IP, contenido y copias
-            console.log('[WEB] Enviando a Flutter:', { ip, copies, contentLength: content.length });
-            if (window.NativePrinter && window.NativePrinter.postMessage) {
-              window.NativePrinter.postMessage(JSON.stringify({
-                type: 'printToPrinter',
-                ip: ip,
-                content: content,
-                copies: copies
-              }));
-              showMessage(`Factura enviada a impresora ${ip} (${copies} copias)`, 'success');
-            } else {
-              showMessage('Error: No se detectó el canal NativePrinter', 'error');
-            }
-          })
-          .catch(error => {
-            console.error('Error cargando content.txt:', error);
-            showMessage('Error al cargar el contenido de la factura', 'error');
-          });
+        // Obtener el contenido de la factura desde una variable JavaScript
+        const invoiceContent = PrintUI.getInvoiceContent(); // Función que retorna el contenido
+        
+        if (!invoiceContent) {
+          showMessage('Error: No se pudo obtener el contenido de la factura', 'error');
+          return;
+        }
+        
+        // Obtener configuración de impresoras
+        const printers = PrintUI.getPrintersConfig();
+        
+        if (printers.length === 0) {
+          alert('Por favor, configura al menos una impresora con IP y número de copias');
+          return;
+        }
+        
+        // Enviar cada impresora configurada a Flutter
+        printers.forEach(printer => {
+          const printData = {
+            content: invoiceContent,
+            printer_ip: printer.ip,
+            nro_copies: printer.copies
+          };
+          
+          console.log('[WEB] Enviando a Flutter callDirectPrint:', printData);
+          if (window.NativePrinter && window.NativePrinter.postMessage) {
+            window.NativePrinter.postMessage(JSON.stringify({
+              type: 'callDirectPrint',
+              data: printData
+            }));
+            showMessage(`Factura enviada a impresora ${printer.ip} (${printer.copies} copias)`, 'success');
+          } else {
+            showMessage('Error: No se detectó el canal NativePrinter', 'error');
+          }
+        });
       }
   
       function handlePrint() {
@@ -510,7 +516,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
       }
   
-      return { init };
+      return { 
+        init,
+        setInvoiceContent,
+        getInvoiceContent,
+        getPrintersConfig
+      };
     })();
   
     // Inicialización al cargar la página
@@ -525,47 +536,64 @@ document.addEventListener('DOMContentLoaded', function() {
     // Función para cargar y enviar la factura automáticamente
     async function loadAndPrintInvoice() {
       try {
-        const response = await fetch('content.txt');
-        if (response.ok) {
-          const invoiceContent = await response.text();
+        // Obtener el contenido de la factura desde una variable JavaScript
+        const invoiceContent = PrintUI.getInvoiceContent(); // Función que retorna el contenido
+        
+        if (!invoiceContent) {
+          console.error('Error: No se pudo obtener el contenido de la factura');
+          return;
+        }
+        
+        // Colocar el contenido en el textarea
+        const textInput = document.getElementById('textInput');
+        if (textInput) {
+          textInput.value = invoiceContent;
+          textInput.style.height = 'auto';
+          textInput.style.height = Math.max(200, textInput.scrollHeight) + 'px';
+        }
+        
+        // Guardar en localStorage
+        localStorage.setItem('savedText', invoiceContent);
+        
+        // Si estamos en WebView de Flutter, enviar automáticamente
+        if (PrintBridge.isFlutterWebView()) {
+          const printers = PrintUI.getPrintersConfig();
           
-          // Colocar el contenido en el textarea
-          const textInput = document.getElementById('textInput');
-          if (textInput) {
-            textInput.value = invoiceContent;
-            textInput.style.height = 'auto';
-            textInput.style.height = Math.max(200, textInput.scrollHeight) + 'px';
-          }
-          
-          // Guardar en localStorage
-          localStorage.setItem('savedText', invoiceContent);
-          
-          // Verificar si hay imagen base64 para procesar en Flutter
-          const hasImage = invoiceContent.includes('<imagen_grande>');
-          
-          if (hasImage && PrintBridge.isFlutterWebView()) {
-            // Enviar a Flutter para procesamiento de imagen
-            console.log('[WEB] Detectada imagen base64, enviando a Flutter para procesamiento');
-            if (window.NativePrinter && window.NativePrinter.postMessage) {
-              window.NativePrinter.postMessage(JSON.stringify({
-                type: 'processInvoiceWithImage',
+          if (printers.length > 0) {
+            // Enviar cada impresora configurada a Flutter
+            printers.forEach(printer => {
+              const printData = {
                 content: invoiceContent,
-                title: 'Factura Electrónica con Imagen',
-                printers: []
-              }));
-              showMessage('Factura con imagen enviada a Flutter para procesamiento', 'success');
-            }
+                printer_ip: printer.ip,
+                nro_copies: printer.copies
+              };
+              
+              console.log('[WEB] Enviando automáticamente a Flutter callDirectPrint:', printData);
+              if (window.NativePrinter && window.NativePrinter.postMessage) {
+                window.NativePrinter.postMessage(JSON.stringify({
+                  type: 'callDirectPrint',
+                  data: printData
+                }));
+                showMessage(`Factura enviada automáticamente a ${printer.ip} (${printer.copies} copias)`, 'success');
+              }
+            });
           } else {
-            // Enviar a impresión normal (sin imagen o en navegador)
+            // Si no hay impresoras configuradas, usar impresión por defecto
             setTimeout(() => {
               PrintBridge.callDirectPrint(invoiceContent, 'Factura Electrónica', []);
               showMessage('Factura enviada a impresión automáticamente', 'success');
             }, 1000);
           }
+        } else {
+          // Enviar a impresión normal (navegador)
+          setTimeout(() => {
+            PrintBridge.callDirectPrint(invoiceContent, 'Factura Electrónica', []);
+            showMessage('Factura enviada a impresión automáticamente', 'success');
+          }, 1000);
         }
       } catch (error) {
-        console.error('Error cargando la factura:', error);
-        showMessage('Error al cargar la factura', 'error');
+        console.error('Error procesando la factura:', error);
+        showMessage('Error al procesar la factura', 'error');
       }
     }
   })(window, document);
